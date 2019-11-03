@@ -1,8 +1,181 @@
 <html>
     <head>
-        
+        <style>
+            body {
+                font-family: 'Century Gothic', sans-serif;
+            }
+
+            .header {
+                background-color: olive;
+                color: white;
+                padding: 1rem;
+            }
+
+            nav {
+                display: flex;
+                justify-content: space-around;
+            }
+
+            a {
+                color: white;
+                text-decoration: none;
+                padding: .5rem;
+            }
+
+            .selected {
+                background-color: thistle;
+                border-radius: 5px;
+                color: teal;
+            }
+
+            h2 {
+                padding: 1rem;
+            }
+
+            ul {
+                padding: 0 1rem 2rem 1rem;
+                list-style-type: none;
+            }
+            
+            p {
+                padding-left: 1rem;
+            }
+
+
+
+            
+        </style>
+        <title>Egg Average Prices React</title>
+        <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/16.1.0/umd/react.development.js"></script>
+        <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/16.1.0/umd/react-dom.development.js"></script>
+        <script src='https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js'></script>
+		<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.1.2/react-router-dom.js"></script>
     </head>
     <body>
+        <div id='root'></div>
+        <script type='text/babel'>
+            const { Component } = React;
+            const { render } = ReactDOM;
+            const { HashRouter, Route, Link, Switch, Redirect } = ReactRouterDOM;
+            
+            const root = document.querySelector('#root');
+
+            const Nav = ({props}) => {
+                const path = props.location.pathname;
+                return (
+                    <div className='header'>
+                        <h1>Egg Product Averages React</h1>
+                        <nav>
+                            <Link to='/' className={ path === '/' ? 'selected' : '' }>Home</Link>
+                            <Link to='/products' className={ path === '/products' ? 'selected' : '' }>Products</Link>
+                        </nav>
+                    </div>
+                )
+            }
+
+            const Home = ({products, offerings}) => {
+                if(!products.length) {
+                    return null;
+                }
+                return (
+                    <div>
+                        <h2>Home</h2>
+                        <p>
+                            We have {products.length} products with an average price of 
+                            {
+                                ` $${(offerings.map(offering => offering.price).reduce((a, b) => a + b) / offerings.length).toFixed(2)}`
+                            }
+                        </p>
+                    </div>
+                )
+            }
+
+            const Products = ({products}) => {
+                if(!products.length) {
+                    return null;
+                }
+                return (
+                    <div>
+                        <h2>Products</h2>
+                        <ul>
+                            {
+                                products.map(product => {
+                                    return (
+                                        <ul key={ product.id }>
+                                            <li><b>Product:</b> {product.name}</li>
+                                            <li><b>Suggested Price:</b> ${product.suggestedPrice.toFixed(2)}</li>
+                                            <li><b>Average Price:</b> ${product.averagePrice.toFixed(2)}</li>
+                                            <li><b>Lowest Price:</b> ${product.lowestPriceCompany.price.toFixed(2)} offered by {product.lowestPriceCompany.company.name}</li>
+                                        </ul>
+                                    )
+                                })
+                            }
+                        </ul>
+                    </div>
+                )
+            }
+            
+            const combineData = (products, companies, offerings) => {
+                return products.map(product => {
+                    return {
+                        ...product,
+                        averagePrice: (offerings
+                            .filter(offering => offering.productId === product.id)
+                            .reduce((accum, offering) => {
+                                return accum + offering.price
+                            }, 0) / offerings.filter(offering => offering.productId === product.id).length),
+                        lowestPriceCompany: {
+                            price: offerings
+                            .reduce((prev, curr) => prev.price < curr.price ? prev : curr).price,
+                            company: companies.find(company => {
+                                return company.id === offerings.reduce((prev, curr) => prev.price < curr.price ? prev : curr).companyId
+                            })
+                        }
+                    }
+                })
+            }
+
+            class App extends Component {
+                constructor() {
+                    super();
+                    this.state = {
+                        products: [],
+                        offerings: []
+                    }
+                }
+
+                componentDidMount() {
+                    Promise.all([
+                        axios.get('https://acme-users-api-rev.herokuapp.com/api/products'),
+                        axios.get('https://acme-users-api-rev.herokuapp.com/api/companies'),
+                        axios.get('https://acme-users-api-rev.herokuapp.com/api/offerings')
+                        ])
+                        .then(res => res.map(r => r.data))
+                        .then(data => {
+                            const [products, companies, offerings] = data;
+                            this.setState( { products: combineData(products, companies, offerings), offerings: offerings } )
+                        })
+                }
+
+                render() {
+                    const { products, offerings } = this.state;
+                    return (
+                        <HashRouter>
+                            <Route render={(props) => <Nav props={ props } />}/>
+                            <Switch>
+                                <Route exact path='/' render={() => <Home products= { products } offerings= {offerings}/> } />
+                                <Route path='/products' render={() => <Products products= { products } /> } />
+                                <Redirect to='/' />
+                            </Switch>
+                        </HashRouter>
+                    )
+                }
+            }
+
+            render(<App />, root);
+
+        </script>
 
     </body>
 </html>
